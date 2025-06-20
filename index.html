@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>AR Building Viewer</title>
+  <title>AR Building Viewer (with GPS)</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <style>
     html, body {
@@ -12,18 +12,8 @@
       background: #000;
       color: white;
       font-family: sans-serif;
-      overflow: hidden;
     }
-    #loading, #error {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      height: 100vh;
-      padding: 2em;
-      font-size: 1.2em;
-    }
-    #distance {
+    #status {
       position: absolute;
       top: 10px;
       width: 100%;
@@ -35,7 +25,7 @@
     model-viewer {
       width: 100vw;
       height: 100vh;
-      display: none;
+      background-color: #000;
     }
     button[slot="ar-button"] {
       position: absolute;
@@ -55,9 +45,7 @@
 </head>
 <body>
 
-  <div id="loading">📍 Checking your location…</div>
-  <div id="error" style="display: none;">❌ You are not at the correct location.<br>Please go to the building site to view the AR model.</div>
-  <div id="distance"></div>
+  <div id="status">📍 Checking location…</div>
 
   <model-viewer
     id="model"
@@ -72,8 +60,7 @@
     shadow-intensity="1"
     scale="1 1 1"
     alt="3D building model"
-    reveal="interaction"
-    style="background-color: #000;">
+    reveal="interaction">
     
     <button slot="ar-button">📱 View in AR</button>
   </model-viewer>
@@ -82,11 +69,7 @@
     const TARGET_LAT = 26.160183;
     const TARGET_LON = 91.738725;
     const ALLOWED_RADIUS_METERS = 50;
-
-    const loading = document.getElementById("loading");
-    const error = document.getElementById("error");
-    const model = document.getElementById("model");
-    const distanceDisplay = document.getElementById("distance");
+    const statusDiv = document.getElementById("status");
 
     function getDistanceMeters(lat1, lon1, lat2, lon2) {
       const R = 6371000;
@@ -106,23 +89,18 @@
         const userLon = position.coords.longitude;
         const accuracy = position.coords.accuracy;
         const dist = getDistanceMeters(userLat, userLon, TARGET_LAT, TARGET_LON);
-        console.log(`User is ${dist.toFixed(1)}m from target. GPS accuracy: ${accuracy}m`);
-
-        loading.style.display = 'none';
 
         if (dist <= ALLOWED_RADIUS_METERS) {
-          model.style.display = 'block';
-          distanceDisplay.textContent = `✅ You're at the correct location. Distance: ${dist.toFixed(1)}m (Accuracy ±${accuracy.toFixed(1)}m)`;
+          statusDiv.textContent = `✅ You are at the correct location. Distance: ${dist.toFixed(1)}m (Accuracy ±${accuracy.toFixed(1)}m)`;
         } else {
-          error.style.display = 'block';
-          distanceDisplay.textContent = `❌ Too far. You're ${dist.toFixed(1)}m from the site. Accuracy: ±${accuracy.toFixed(1)}m`;
+          statusDiv.textContent = `⚠️ Too far from target. Distance: ${dist.toFixed(1)}m (Accuracy ±${accuracy.toFixed(1)}m)`;
         }
       }, (err) => {
+        statusDiv.textContent = "❌ Location access denied.";
         console.error(err);
-        loading.innerText = "❌ Location access denied. Cannot load AR.";
       });
     } else {
-      loading.innerText = "❌ Geolocation not supported on this device.";
+      statusDiv.textContent = "❌ Geolocation not supported.";
     }
   </script>
 
