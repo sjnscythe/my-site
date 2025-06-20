@@ -1,45 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>AR Building Viewer</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <style>
     html, body {
       margin: 0;
+      padding: 0;
       height: 100%;
       background: #000;
       color: white;
       font-family: sans-serif;
+      overflow: hidden;
     }
-    #loading {
+    #loading, #error {
       display: flex;
-      align-items: center;
       justify-content: center;
-      height: 100vh;
-      font-size: 18px;
+      align-items: center;
       text-align: center;
-      padding: 20px;
+      height: 100vh;
+      padding: 2em;
+      font-size: 1.2em;
     }
-    #model {
-      display: none;
+    #distance {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      font-size: 1em;
+      z-index: 10;
+      color: #fff;
+    }
+    model-viewer {
       width: 100vw;
       height: 100vh;
-    }
-    #error {
       display: none;
-      padding: 30px;
+    }
+    button[slot="ar-button"] {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
       font-size: 18px;
-      text-align: center;
+      background: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div id="loading">📡 Checking your location to load the AR model...</div>
-  <div id="error">❌ You are not at the building site.<br>Please go to the correct location to view the AR model.</div>
 
-  <model-viewer id="model"
-    src="your-building.glb"  <!-- Replace with your actual file -->
+  <div id="loading">📍 Checking your location…</div>
+  <div id="error" style="display: none;">❌ You are not at the correct location.<br>Please go to the building site to view the AR model.</div>
+  <div id="distance"></div>
+
+  <model-viewer
+    id="model"
+    src="your-building.glb"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-status="not-presenting"
@@ -49,41 +69,59 @@
     exposure="1"
     shadow-intensity="1"
     scale="1 1 1"
-    alt="3D building model">
+    alt="3D building model"
+    reveal="interaction"
+    style="background-color: #000;">
+    <button slot="ar-button">📱 View in AR</button>
   </model-viewer>
 
   <script>
     const TARGET_LAT = 26.160183;
     const TARGET_LON = 91.738725;
-    const THRESHOLD_METERS = 20; // Distance range in meters
+    const ALLOWED_RADIUS_METERS = 50;
 
-    function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
+    const loading = document.getElementById("loading");
+    const error = document.getElementById("error");
+    const model = document.getElementById("model");
+    const distanceDisplay = document.getElementById("distance");
+
+    function getDistanceMeters(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
       const a =
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
 
-    navigator.geolocation.getCurrentPosition(position => {
-      const userLat = position.coords.latitude;
-      const userLon = position.coords.longitude;
-      const distance = getDistanceFromLatLon(userLat, userLon, TARGET_LAT, TARGET_LON);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const userLat = position.coords.latitude;
+        const userLon = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        const dist = getDistanceMeters(userLat, userLon, TARGET_LAT, TARGET_LON);
+        console.log(`User is ${dist.toFixed(1)}m from target. GPS accuracy: ${accuracy}m`);
 
-      if (distance <= THRESHOLD_METERS) {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('model').style.display = 'block';
-      } else {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('error').style.display = 'block';
-      }
-    }, () => {
-      document.getElementById('loading').innerText = "❌ Location access denied. Cannot load AR model.";
-    });
+        loading.style.display = 'none';
+
+        if (dist <= ALLOWED_RADIUS_METERS) {
+          model.style.display = 'block';
+          distanceDisplay.textContent = `✅ You're at the correct location. Distance: ${dist.toFixed(1)}m (Accuracy ±${accuracy.toFixed(1)}m)`;
+        } else {
+          error.style.display = 'block';
+          distanceDisplay.textContent = `❌ Too far. You're ${dist.toFixed(1)}m from the site. Accuracy: ±${accuracy.toFixed(1)}m`;
+        }
+      }, (err) => {
+        console.error(err);
+        loading.innerText = "❌ Location access denied. Cannot load AR.";
+      });
+    } else {
+      loading.innerText = "❌ Geolocation not supported on this device.";
+    }
   </script>
+
 </body>
 </html>
