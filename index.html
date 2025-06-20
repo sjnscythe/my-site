@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AR Building Viewer</title>
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      font-family: sans-serif;
+      color: white;
+    }
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      padding: 20px;
+    }
+    #model {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+    }
+    #error {
+      display: none;
+      padding: 40px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">📡 Checking your location...<br/>Please enable location permissions.</div>
+  <div id="error">❌ You are not at the building site.<br/>Move to the site to view the AR model.</div>
+
+  <model-viewer id="model"
+    src="building.glb"  <!-- Replace this with your actual .glb file -->
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    camera-controls
+    auto-rotate
+    environment-image="neutral"
+    exposure="1"
+    shadow-intensity="1"
+    scale="1 1 1"
+    alt="3D building model">
+  </model-viewer>
+
+  <script>
+    const TARGET_LAT = 26.160183;
+    const TARGET_LON = 91.738725;
+    const THRESHOLD_METERS = 100; // Adjusted from 15 to 100 meters
+
+    function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // Radius of Earth in meters
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    navigator.geolocation.getCurrentPosition(position => {
+      const userLat = position.coords.latitude;
+      const userLon = position.coords.longitude;
+      const dist = getDistanceFromLatLon(userLat, userLon, TARGET_LAT, TARGET_LON);
+
+      console.log(`You are ${dist.toFixed(2)} meters from the target location.`);
+
+      document.getElementById('loading').style.display = 'none';
+      if (dist <= THRESHOLD_METERS) {
+        document.getElementById('model').style.display = 'block';
+      } else {
+        document.getElementById('error').style.display = 'block';
+      }
+    }, error => {
+      document.getElementById('loading').innerText = '❌ Location access failed.\nPlease allow GPS access and reload the page.';
+      console.error("Geolocation error:", error);
+    });
+  </script>
+</body>
+</html>
